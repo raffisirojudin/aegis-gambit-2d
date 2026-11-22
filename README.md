@@ -1,33 +1,43 @@
-# React + TypeScript + Vite
+# Aegis Gambit 2.5D
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Aegis Gambit is a tactical chess duel game built with React, TypeScript, and Vite. Standard chess movement is combined with real-time combat: whenever a piece captures another, the game enters a short 2.5D arena duel, and the duel result determines whether the capture succeeds.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Chess board with legal move validation, promotion, check, checkmate, and draw handling
+- Capture duels with health bars, cooldowns, attacks, parry, dash, and special abilities
+- Player vs AI mode with a minimax-based opponent
+- Player vs Player mode on a single device
+- Lobby screen for selecting a mode before starting
+- Responsive canvas rendering with multiple visual themes
+- Synthesized sound effects and optional mute
+- GitHub Pages deployment through GitHub Actions
 
-## React Compiler
+## Requirements
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 20 or newer
+- npm
 
-## Expanding the Oxlint configuration
+## Development
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-# aegis-gambit-2d
+## Checks
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+```
+
+## Deployment
+
+Pushes to `main` build and deploy the `dist` directory to GitHub Pages through `.github/workflows/deploy.yml`. In the repository settings, set Pages source to GitHub Actions.
+
+## Security
+
+Secrets and environment files are ignored by `.gitignore`. Do not commit `.env` files, API keys, tokens, or build artifacts.

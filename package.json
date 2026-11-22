@@ -26,5 +26,6 @@
     "typescript": "~7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.1"
-  }
+  },
+  "description": "Tactical chess duel game with board play and 2.5D combat captures."
 }
