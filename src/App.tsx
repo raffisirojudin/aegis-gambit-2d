@@ -1,11 +1,17 @@
 import { useEffect } from 'react'
 import { GameCanvas } from './components/GameCanvas'
 import { GameUI } from './components/GameUI'
+import { Lobby } from './components/Lobby'
 import { AI_COLOR } from './game/constants'
 import { useGameStore } from './store/gameStore'
 
 export default function App() {
+  const screen = useGameStore((state) => state.screen)
+  const mode = useGameStore((state) => state.mode)
+
   useEffect(() => {
+    if (screen !== 'GAME' || mode !== 'AI') return
+
     let timer: number | null = null
     let scheduled = ''
 
@@ -33,7 +39,9 @@ export default function App() {
       unsubscribe()
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [])
+  }, [screen, mode])
+
+  if (screen === 'LOBBY') return <Lobby />
 
   return (
     <main className="app-shell">

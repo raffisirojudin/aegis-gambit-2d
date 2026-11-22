@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { CombatEngine } from '../game/combat'
+import { CombatEngine, type ActionKind } from '../game/combat'
 import { FIXED_STEP } from '../game/constants'
 import { createRng } from '../game/rng'
 import { GameRenderer } from '../render/scene'
@@ -28,6 +28,10 @@ export function GameCanvas() {
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
     resize()
+    const initialState = useGameStore.getState()
+    const initialTime = performance.now() / 1000
+    renderer.update(0, initialTime, initialState, width, height)
+    renderer.draw(context, width, height, initialState, initialState.engine, initialTime)
     const observer = new ResizeObserver(resize)
     observer.observe(canvas)
 
@@ -47,7 +51,8 @@ export function GameCanvas() {
       if (!held.has(event.code)) {
         const state = useGameStore.getState()
         if (state.phase === 'COMBAT' && state.engine) {
-          const action: Record<string, 'light' | 'heavy' | 'parry' | 'dash' | 'special'> = {
+          const engine = state.engine
+          const action: Record<string, ActionKind> = {
             KeyJ: 'light',
             KeyL: 'heavy',
             KeyK: 'parry',
@@ -57,8 +62,22 @@ export function GameCanvas() {
             KeyE: 'special',
             KeyQ: 'special',
           }
-          const kind = action[event.code]
-          if (kind) state.engine.press(kind)
+          if (engine.twoPlayer) {
+            const secondAction: Record<string, ActionKind> = {
+              Digit1: 'light',
+              Digit2: 'heavy',
+              Digit3: 'parry',
+              Digit4: 'dash',
+              Digit5: 'special',
+            }
+            const firstKind = action[event.code]
+            const secondKind = secondAction[event.code]
+            if (firstKind) engine.press(firstKind, engine.sideForColor('w'))
+            if (secondKind) engine.press(secondKind, engine.sideForColor('b'))
+          } else {
+            const kind = action[event.code]
+            if (kind) engine.press(kind)
+          }
         }
       }
       held.add(event.code)
@@ -69,7 +88,7 @@ export function GameCanvas() {
     const onPointerDown = (event: PointerEvent) => {
       const state = useGameStore.getState()
       if (state.phase === 'COMBAT' && state.engine) {
-        state.engine.press(event.button === 2 ? 'parry' : 'light')
+        if (!state.engine.twoPlayer) state.engine.press(event.button === 2 ? 'parry' : 'light')
         return
       }
       if (state.phase === 'BOARD') {
@@ -121,12 +140,17 @@ export function GameCanvas() {
 
       if (state.phase === 'COMBAT' && state.engine) {
         const engine = state.engine
-        const right = held.has('KeyD') || held.has('ArrowRight')
-        const left = held.has('KeyA') || held.has('ArrowLeft')
+        const firstMove = Number(held.has('KeyD')) - Number(held.has('KeyA'))
+        const secondMove = Number(held.has('ArrowRight')) - Number(held.has('ArrowLeft'))
+        const soloMove = Number(held.has('KeyD') || held.has('ArrowRight')) - Number(held.has('KeyA') || held.has('ArrowLeft'))
+        const whiteSide = engine.sideForColor('w')
+        const attackerMove = whiteSide === 'attacker' ? firstMove : secondMove
+        const defenderMove = whiteSide === 'attacker' ? secondMove : firstMove
         accumulator += dt
         let steps = 0
         while (accumulator >= FIXED_STEP && steps < 3) {
-          engine.step(Number(right) - Number(left))
+          if (engine.twoPlayer) engine.step(attackerMove, defenderMove)
+          else engine.step(soloMove)
           accumulator -= FIXED_STEP
           steps++
         }

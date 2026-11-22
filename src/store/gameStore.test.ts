@@ -21,6 +21,7 @@ function captureSetup(): DuelSetup {
 
 describe('gameStore', () => {
   beforeEach(() => {
+    useGameStore.setState({ mode: 'AI', screen: 'GAME' })
     useGameStore.getState().resetGame()
   })
 
@@ -96,5 +97,54 @@ describe('gameStore', () => {
 
     expect(state.phase).toBe('GAMEOVER')
     expect(state.winner).toBe('w')
+  })
+
+  it('mode PVP membiarkan kedua warna bergiliran di papan', () => {
+    const store = useGameStore.getState()
+    store.startGame('PVP')
+
+    store.selectSquare('e2')
+    store.selectSquare('e4')
+    expect(useGameStore.getState().chess.turn()).toBe('b')
+
+    useGameStore.getState().selectSquare('e7')
+    useGameStore.getState().selectSquare('e5')
+    const state = useGameStore.getState()
+
+    expect(state.screen).toBe('GAME')
+    expect(state.mode).toBe('PVP')
+    expect(state.history).toEqual(['e4', 'e5'])
+  })
+
+  it('rebutan bidak di mode PVP membuat duel dua pemain', () => {
+    const store = useGameStore.getState()
+    store.startGame('PVP')
+    store.applyDirect({ from: 'e2', to: 'e4' })
+    useGameStore.getState().applyDirect({ from: 'd7', to: 'd5' })
+    useGameStore.getState().selectSquare('e4')
+    useGameStore.getState().selectSquare('d5')
+    const state = useGameStore.getState()
+
+    expect(state.phase).toBe('TRANSITION')
+    expect(state.duel).toMatchObject({
+      attackerColor: 'w',
+      defenderColor: 'b',
+      twoPlayer: true,
+      humanSide: 'attacker',
+    })
+  })
+
+  it('kembali ke lobi mereset papan tetapi mempertahankan mode', () => {
+    const store = useGameStore.getState()
+    store.startGame('PVP')
+    store.selectSquare('e2')
+    store.selectSquare('e4')
+    useGameStore.getState().returnToLobby()
+    const state = useGameStore.getState()
+
+    expect(state.screen).toBe('LOBBY')
+    expect(state.mode).toBe('PVP')
+    expect(state.history).toEqual([])
+    expect(state.chess.turn()).toBe('w')
   })
 })

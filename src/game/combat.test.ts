@@ -133,4 +133,24 @@ describe('CombatEngine', () => {
     expect(engine.timeLeft).toBe(0)
     expect(engine.result).toBe('DRAW')
   })
+
+  it('duel dua pemain menerima input gerak dan aksi dari kedua sisi', () => {
+    const engine = new CombatEngine({ ...setup(), twoPlayer: true }, passiveRng)
+    engine.countdown = 0
+    engine.fighters.attacker.x = 0
+    engine.fighters.defender.x = 1.1
+
+    engine.press('light', 'defender')
+    expect(pending(engine).defender.light).toBeDefined()
+    expect(pending(engine).attacker.light).toBeUndefined()
+    expect(engine.sideForColor('w')).toBe('attacker')
+    expect(engine.sideForColor('b')).toBe('defender')
+
+    const attackerStart = engine.fighters.attacker.x
+    const defenderStart = engine.fighters.defender.x
+    engine.step(1, -1)
+
+    expect(engine.fighters.attacker.x).toBeGreaterThan(attackerStart)
+    expect(engine.fighters.defender.x).toBeLessThan(defenderStart)
+  })
 })

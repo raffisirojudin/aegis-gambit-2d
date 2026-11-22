@@ -15,6 +15,7 @@ export interface DuelSetup {
   attackerPiece: PieceSymbol
   defenderPiece: PieceSymbol
   humanSide: Side
+  twoPlayer?: boolean
 }
 
 export interface Intent {
@@ -231,6 +232,7 @@ export class CombatEngine {
   readonly fighters: Record<Side, Fighter>
   readonly setup: DuelSetup
   readonly humanSide: Side
+  readonly twoPlayer: boolean
   projectiles: Projectile[] = []
   events: CombatEvent[] = []
   timeLeft = DUEL_SECONDS
@@ -251,24 +253,29 @@ export class CombatEngine {
   constructor(setup: DuelSetup, rng: Rng) {
     this.setup = setup
     this.humanSide = setup.humanSide
+    this.twoPlayer = setup.twoPlayer ?? false
     this.rng = rng
     this.fighters = {
       attacker: this.createFighter('attacker', setup.attackerColor, setup.attackerPiece, -2),
       defender: this.createFighter('defender', setup.defenderColor, setup.defenderPiece, 2),
     }
-    this.ai = setup.humanSide === 'attacker' ? new CombatAI() : setup.humanSide === 'defender' ? new CombatAI() : null
+    this.ai = this.twoPlayer ? null : setup.humanSide === 'attacker' ? new CombatAI() : setup.humanSide === 'defender' ? new CombatAI() : null
   }
 
   random(): number {
     return this.rng()
   }
 
-  press(kind: ActionKind): void {
-    if (this.countdown > 0) return
-    this.pending[this.humanSide][kind] = this.elapsed + 0.14
+  sideForColor(color: Color): Side {
+    return this.fighters.attacker.color === color ? 'attacker' : 'defender'
   }
 
-  step(moveDir: number): void {
+  press(kind: ActionKind, side: Side = this.humanSide): void {
+    if (this.countdown > 0) return
+    this.pending[this.twoPlayer ? side : this.humanSide][kind] = this.elapsed + 0.14
+  }
+
+  step(moveDir: number, secondMoveDir = 0): void {
     if (this.result !== null) return
     if (this.countdown > 0) {
       this.countdown = Math.max(0, this.countdown - FIXED_STEP)
@@ -298,19 +305,24 @@ export class CombatEngine {
     attacker.facing = defender.x >= attacker.x ? 1 : -1
     defender.facing = -attacker.facing
 
-    let aiMove = 0
-    if (this.ai) {
-      const aiSide: Side = this.humanSide === 'attacker' ? 'defender' : 'attacker'
-      const opponentSide: Side = aiSide === 'attacker' ? 'defender' : 'attacker'
-      const intent = this.ai.think(this.fighters[aiSide], this.fighters[opponentSide], this)
-      aiMove = intent.move
-      for (const kind of ACTION_ORDER) {
-        if (intent[kind]) this.queue(aiSide, kind)
+    if (this.twoPlayer) {
+      this.tick(attacker, defender, moveDir)
+      this.tick(defender, attacker, secondMoveDir)
+    } else {
+      let aiMove = 0
+      if (this.ai) {
+        const aiSide: Side = this.humanSide === 'attacker' ? 'defender' : 'attacker'
+        const opponentSide: Side = aiSide === 'attacker' ? 'defender' : 'attacker'
+        const intent = this.ai.think(this.fighters[aiSide], this.fighters[opponentSide], this)
+        aiMove = intent.move
+        for (const kind of ACTION_ORDER) {
+          if (intent[kind]) this.queue(aiSide, kind)
+        }
       }
-    }
 
-    this.tick(attacker, defender, this.humanSide === 'attacker' ? moveDir : aiMove)
-    this.tick(defender, attacker, this.humanSide === 'defender' ? moveDir : aiMove)
+      this.tick(attacker, defender, this.humanSide === 'attacker' ? moveDir : aiMove)
+      this.tick(defender, attacker, this.humanSide === 'defender' ? moveDir : aiMove)
+    }
 
     const minGap = 1
     if (defender.x - attacker.x < minGap) {

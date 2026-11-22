@@ -467,3 +467,239 @@ button {
     max-height: 45vh;
   }
 }
+
+.lobby-screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  min-height: 100dvh;
+  padding: 32px 20px;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(212, 175, 55, 0.16), transparent 46%),
+    radial-gradient(circle at 85% 90%, rgba(74, 144, 226, 0.12), transparent 40%),
+    #0b0d11;
+}
+
+.lobby-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(230, 226, 216, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(230, 226, 216, 0.04) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at 50% 45%, black, transparent 72%);
+  pointer-events: none;
+}
+
+.lobby-card {
+  position: relative;
+  width: min(880px, 100%);
+  padding: 38px;
+  border: 1px solid rgba(212, 175, 55, 0.24);
+  border-radius: 18px;
+  background: rgba(14, 17, 22, 0.9);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+}
+
+.lobby-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.lobby-brand__mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  border-radius: 10px;
+  color: #f0d98a;
+  font-size: 26px;
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.lobby-brand strong {
+  display: block;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  color: #f2eee4;
+}
+
+.lobby-brand small {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  color: rgba(242, 238, 228, 0.42);
+}
+
+.lobby-eyebrow {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  color: rgba(212, 175, 55, 0.8);
+}
+
+.lobby-card h1 {
+  margin: 12px 0 10px;
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 400;
+  line-height: 1.15;
+  color: #f2eee4;
+}
+
+.lobby-lead {
+  max-width: 620px;
+  margin: 0 0 30px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(242, 238, 228, 0.55);
+}
+
+.lobby-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.lobby-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid rgba(230, 226, 216, 0.12);
+  border-radius: 12px;
+  background: rgba(230, 226, 216, 0.03);
+  color: #f2eee4;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.lobby-mode:hover,
+.lobby-mode:focus-visible {
+  border-color: rgba(212, 175, 55, 0.6);
+  background: rgba(212, 175, 55, 0.08);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.lobby-mode__glyph {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 9px;
+  color: #f0d98a;
+  font-size: 23px;
+  background: rgba(8, 10, 14, 0.5);
+}
+
+.lobby-mode__body {
+  display: grid;
+  gap: 6px;
+}
+
+.lobby-mode__title {
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+
+.lobby-mode__description {
+  font-size: 11px;
+  line-height: 1.65;
+  color: rgba(242, 238, 228, 0.5);
+}
+
+.lobby-mode__cta {
+  margin-top: auto;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: rgba(240, 217, 138, 0.9);
+}
+
+.lobby-hints {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(230, 226, 216, 0.08);
+}
+
+.lobby-hints div {
+  display: grid;
+  gap: 5px;
+}
+
+.lobby-hints strong {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: rgba(212, 175, 55, 0.75);
+}
+
+.lobby-hints span {
+  font-size: 10px;
+  line-height: 1.55;
+  color: rgba(242, 238, 228, 0.42);
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-controls--pvp {
+  align-items: end;
+}
+
+.duel-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid rgba(230, 226, 216, 0.16);
+  border-radius: 9px;
+  background: rgba(8, 10, 14, 0.86);
+}
+
+.duel-pad__label {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: rgba(240, 217, 138, 0.8);
+}
+
+.duel-pad__row {
+  display: flex;
+  gap: 4px;
+}
+
+.duel-pad__row button {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .lobby-card {
+    padding: 24px 18px;
+  }
+
+  .lobby-modes,
+  .lobby-hints {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-hints {
+    gap: 14px;
+  }
+}

@@ -141,8 +141,11 @@ export class GameRenderer {
 
   handleCombatEvent(event: CombatEvent, engine: CombatEngine, width: number, height: number): void {
     const muted = useGameStore.getState().muted
+    const humanWon = engine.result === (engine.humanSide === 'attacker' ? 'ATTACKER' : 'DEFENDER')
     const sfx = event.type === 'ko'
-      ? engine.result === null || engine.result === 'DRAW' || engine.result === (engine.humanSide === 'attacker' ? 'ATTACKER' : 'DEFENDER') ? 'win' : 'lose'
+      ? engine.twoPlayer
+        ? engine.result === null || engine.result === 'DRAW' ? 'lose' : 'win'
+        : engine.result === null || engine.result === 'DRAW' || humanWon ? 'win' : 'lose'
       : event.type === 'dodge' ? 'dodge'
         : event.type === 'special' ? 'special'
           : event.type === 'parry' ? 'parry' : 'hit'
@@ -519,8 +522,8 @@ export class GameRenderer {
         }
       }
 
-      drawFighter(ctx, engine.fighters.attacker, cx + engine.fighters.attacker.x * 78 * scale, ground - 2 * scale, scale, time, 1, engine.fighters.attacker.side !== engine.humanSide, theme)
-      drawFighter(ctx, engine.fighters.defender, cx + engine.fighters.defender.x * 78 * scale, ground - 2 * scale, scale, time, 1, engine.fighters.defender.side !== engine.humanSide, theme)
+      drawFighter(ctx, engine.fighters.attacker, cx + engine.fighters.attacker.x * 78 * scale, ground - 2 * scale, scale, time, 1, !engine.twoPlayer && engine.fighters.attacker.side !== engine.humanSide, theme)
+      drawFighter(ctx, engine.fighters.defender, cx + engine.fighters.defender.x * 78 * scale, ground - 2 * scale, scale, time, 1, !engine.twoPlayer && engine.fighters.defender.side !== engine.humanSide, theme)
 
       for (const particle of this.particles) {
         ctx.globalAlpha = clamp(particle.life / particle.maxLife, 0, 1)
@@ -567,8 +570,10 @@ export class GameRenderer {
     ctx.save()
     ctx.globalAlpha = appear
 
-    drawHealth(ctx, width / 2 - barWidth - 34, top, barWidth, attacker?.hp ?? ARCHETYPES[state.duel.attackerPiece].hp, ARCHETYPES[state.duel.attackerPiece].hp, state.duel.attackerColor, `${ARCHETYPES[state.duel.attackerPiece].name} · ${state.duel.attackerColor === 'w' ? 'Kamu' : 'AI'}`, false)
-    drawHealth(ctx, width / 2 + 34, top, barWidth, defender?.hp ?? ARCHETYPES[state.duel.defenderPiece].hp, ARCHETYPES[state.duel.defenderPiece].hp, state.duel.defenderColor, `${ARCHETYPES[state.duel.defenderPiece].name} · ${state.duel.defenderColor === 'w' ? 'Kamu' : 'AI'}`, true)
+    const colorLabel = (color: 'w' | 'b') =>
+      state.mode === 'PVP' ? (color === 'w' ? 'Pemain 1' : 'Pemain 2') : color === 'w' ? 'Kamu' : 'AI'
+    drawHealth(ctx, width / 2 - barWidth - 34, top, barWidth, attacker?.hp ?? ARCHETYPES[state.duel.attackerPiece].hp, ARCHETYPES[state.duel.attackerPiece].hp, state.duel.attackerColor, `${ARCHETYPES[state.duel.attackerPiece].name} · ${colorLabel(state.duel.attackerColor)}`, false)
+    drawHealth(ctx, width / 2 + 34, top, barWidth, defender?.hp ?? ARCHETYPES[state.duel.defenderPiece].hp, ARCHETYPES[state.duel.defenderPiece].hp, state.duel.defenderColor, `${ARCHETYPES[state.duel.defenderPiece].name} · ${colorLabel(state.duel.defenderColor)}`, true)
 
     const countdown = engine?.countdown ?? 0
     const remaining = countdown > 0 ? countdown : engine?.timeLeft ?? DUEL_SECONDS
@@ -610,39 +615,46 @@ export class GameRenderer {
       ctx.textAlign = 'left'
     }
 
-    const human = engine?.fighters[engine.humanSide]
-    const humanPiece = engine?.fighters[engine.humanSide].piece ?? (state.duel.humanSide === 'attacker' ? state.duel.attackerPiece : state.duel.defenderPiece)
-    const chips: Array<[string, string, number, number]> = [
-      ['J', 'Serang', 0, 1],
-      ['L', 'Berat', human?.cooldowns.heavy ?? 0, ARCHETYPES[humanPiece].heavyCooldown],
-      ['K', 'Tangkis', human?.cooldowns.parry ?? 0, 0.85],
-      ['␣', 'Dash', human?.cooldowns.dash ?? 0, 1.5],
-      ['E', SPECIAL_NAMES[humanPiece], human?.cooldowns.special ?? 0, ARCHETYPES[humanPiece].specialCooldown],
-    ]
-    const chipW = Math.min(84, width / 7.5)
-    const startX = width / 2 - (chips.length * (chipW + 6)) / 2
-    chips.forEach(([key, label, remainingCooldown, total], index) => {
-      const x = startX + index * (chipW + 6)
-      const y = height - 78
-      const progress = total <= 0 ? 1 : 1 - clamp(remainingCooldown / total, 0, 1)
-      ctx.fillStyle = 'rgba(8,10,14,0.75)'
-      ctx.fillRect(x, y, chipW, 46)
-      ctx.strokeStyle = progress >= 1 ? 'rgba(212,175,55,0.65)' : 'rgba(230,226,216,0.15)'
-      ctx.strokeRect(x, y, chipW, 46)
-      ctx.fillStyle = PALETTE.goldBright
-      ctx.font = '600 14px system-ui, sans-serif'
-      ctx.fillText(key, x + 8, y + 18)
-      ctx.fillStyle = 'rgba(233,230,221,0.65)'
-      ctx.font = '9px system-ui, sans-serif'
-      ctx.fillText(label.length > 13 ? `${label.slice(0, 12)}…` : label, x + 8, y + 38)
-      ctx.fillStyle = progress >= 1 ? PALETTE.gold : 'rgba(230,226,216,0.25)'
-      ctx.fillRect(x + 8, y + 25, (chipW - 16) * progress, 2)
-    })
-
     ctx.textAlign = 'center'
-    ctx.fillStyle = 'rgba(233,230,221,0.5)'
-    ctx.font = '10px system-ui, sans-serif'
-    ctx.fillText('A/D gerak  ·  J serang  ·  K tangkis  ·  Space dash  ·  L berat  ·  E khas', width / 2, height - 16)
+    if (engine?.twoPlayer) {
+      ctx.fillStyle = 'rgba(233,230,221,0.62)'
+      ctx.font = '10px system-ui, sans-serif'
+      ctx.fillText('P1 Putih — A/D gerak · J serang · K tangkis · L berat · Space dash · E khas', width / 2, height - 32)
+      ctx.fillText('P2 Hitam — ←/→ gerak · 1 serang · 3 tangkis · 2 berat · 4 dash · 5 khas', width / 2, height - 14)
+    } else {
+      const human = engine?.fighters[engine.humanSide]
+      const humanPiece = engine?.fighters[engine.humanSide].piece ?? (state.duel.humanSide === 'attacker' ? state.duel.attackerPiece : state.duel.defenderPiece)
+      const chips: Array<[string, string, number, number]> = [
+        ['J', 'Serang', 0, 1],
+        ['L', 'Berat', human?.cooldowns.heavy ?? 0, ARCHETYPES[humanPiece].heavyCooldown],
+        ['K', 'Tangkis', human?.cooldowns.parry ?? 0, 0.85],
+        ['␣', 'Dash', human?.cooldowns.dash ?? 0, 1.5],
+        ['E', SPECIAL_NAMES[humanPiece], human?.cooldowns.special ?? 0, ARCHETYPES[humanPiece].specialCooldown],
+      ]
+      const chipW = Math.min(84, width / 7.5)
+      const startX = width / 2 - (chips.length * (chipW + 6)) / 2
+      chips.forEach(([key, label, remainingCooldown, total], index) => {
+        const x = startX + index * (chipW + 6)
+        const y = height - 78
+        const progress = total <= 0 ? 1 : 1 - clamp(remainingCooldown / total, 0, 1)
+        ctx.fillStyle = 'rgba(8,10,14,0.75)'
+        ctx.fillRect(x, y, chipW, 46)
+        ctx.strokeStyle = progress >= 1 ? 'rgba(212,175,55,0.65)' : 'rgba(230,226,216,0.15)'
+        ctx.strokeRect(x, y, chipW, 46)
+        ctx.fillStyle = PALETTE.goldBright
+        ctx.font = '600 14px system-ui, sans-serif'
+        ctx.fillText(key, x + 8, y + 18)
+        ctx.fillStyle = 'rgba(233,230,221,0.65)'
+        ctx.font = '9px system-ui, sans-serif'
+        ctx.fillText(label.length > 13 ? `${label.slice(0, 12)}…` : label, x + 8, y + 38)
+        ctx.fillStyle = progress >= 1 ? PALETTE.gold : 'rgba(230,226,216,0.25)'
+        ctx.fillRect(x + 8, y + 25, (chipW - 16) * progress, 2)
+      })
+
+      ctx.fillStyle = 'rgba(233,230,221,0.5)'
+      ctx.font = '10px system-ui, sans-serif'
+      ctx.fillText('A/D gerak  ·  J serang  ·  K tangkis  ·  Space dash  ·  L berat  ·  E khas', width / 2, height - 16)
+    }
     ctx.textAlign = 'left'
 
     if (engine?.result) {
@@ -660,7 +672,12 @@ export class GameRenderer {
       ctx.fillText('HASIL DUEL', 0, -22)
       ctx.fillStyle = PALETTE.ivory
       ctx.font = '600 22px system-ui, sans-serif'
-      ctx.fillText(resultLabel(engine.result, engine.humanSide), 0, 12)
+      const resultText = engine.twoPlayer
+        ? engine.result === 'DRAW'
+          ? 'IMBANG'
+          : `${(engine.result === 'ATTACKER' ? engine.setup.attackerColor : engine.setup.defenderColor) === 'w' ? 'PUTIH' : 'HITAM'} MENANG`
+        : resultLabel(engine.result, engine.humanSide)
+      ctx.fillText(resultText, 0, 12)
       ctx.fillStyle = 'rgba(233,230,221,0.45)'
       ctx.font = '10px system-ui, sans-serif'
       ctx.fillText('Kembali ke papan…', 0, 34)

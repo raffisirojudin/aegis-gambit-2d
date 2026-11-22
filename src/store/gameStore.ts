@@ -6,6 +6,8 @@ import { AI_COLOR, ARCHETYPES, PLAYER_COLOR, THEMES, isPromotionSquare } from '.
 import { createRng, type Rng } from '../game/rng'
 
 export type Phase = 'BOARD' | 'TRANSITION' | 'COMBAT' | 'GAMEOVER'
+export type GameMode = 'AI' | 'PVP'
+export type Screen = 'LOBBY' | 'GAME'
 
 export interface MoveRequest {
   from: Square
@@ -19,6 +21,8 @@ interface PendingPromotion {
 }
 
 export interface GameState {
+  screen: Screen
+  mode: GameMode
   chess: Chess
   version: number
   phase: Phase
@@ -37,6 +41,8 @@ export interface GameState {
   muted: boolean
   theme: string
 
+  startGame: (mode: GameMode) => void
+  returnToLobby: () => void
   selectSquare: (square: Square) => void
   resolvePromotion: (piece: PieceSymbol) => void
   cancelPromotion: () => void
@@ -54,13 +60,17 @@ export interface GameState {
 
 let matchRng: Rng = createRng(Date.now())
 
-function checkOutcome(chess: Chess, set: (partial: Partial<GameState>) => void): boolean {
+function checkOutcome(chess: Chess, set: (partial: Partial<GameState>) => void, mode: GameMode): boolean {
   if (chess.isCheckmate()) {
     const loser = chess.turn()
+    const winner: Color = loser === 'w' ? 'b' : 'w'
     set({
       phase: 'GAMEOVER',
-      status: `Skakmat — ${loser === PLAYER_COLOR ? 'AI' : 'Kamu'} kalah.`,
-      winner: loser === PLAYER_COLOR ? AI_COLOR : PLAYER_COLOR,
+      status:
+        mode === 'PVP'
+          ? `Skakmat — ${winner === 'w' ? 'Putih' : 'Hitam'} menang.`
+          : `Skakmat — ${loser === PLAYER_COLOR ? 'AI' : 'Kamu'} kalah.`,
+      winner,
     })
     return true
   }
@@ -71,7 +81,14 @@ function checkOutcome(chess: Chess, set: (partial: Partial<GameState>) => void):
   return false
 }
 
-const initialState = () => ({
+function turnLabel(color: Color, mode: GameMode): string {
+  if (mode === 'PVP') return color === 'w' ? 'Pemain 1 (Putih)' : 'Pemain 2 (Hitam)'
+  return color === PLAYER_COLOR ? 'kamu' : 'AI'
+}
+
+const initialState = (mode: GameMode = 'AI', screen: Screen = 'LOBBY') => ({
+  screen,
+  mode,
   chess: new Chess(),
   version: 0,
   phase: 'BOARD' as Phase,
@@ -79,7 +96,7 @@ const initialState = () => ({
   legalTargets: [] as Square[],
   history: [] as string[],
   lastMove: null,
-  status: 'Giliran kamu (Putih). Pilih bidak untuk memulai.',
+  status: mode === 'PVP' ? 'Giliran Pemain 1 (Putih).' : 'Giliran kamu (Putih). Pilih bidak untuk memulai.',
   duel: null,
   engine: null,
   winner: null,
@@ -91,16 +108,38 @@ const initialState = () => ({
   theme: 'classic',
 })
 
+function withPreferences(state: GameState, next: ReturnType<typeof initialState>) {
+  return {
+    ...next,
+    topDown: state.topDown,
+    rotation: state.rotation,
+    showHistory: state.showHistory,
+    muted: state.muted,
+    theme: state.theme,
+  }
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   ...initialState(),
 
+  startGame(mode) {
+    matchRng = createRng(Date.now())
+    set(withPreferences(get(), initialState(mode, 'GAME')))
+  },
+
+  returnToLobby() {
+    set(withPreferences(get(), initialState(get().mode, 'LOBBY')))
+  },
+
   selectSquare(square) {
     const state = get()
-    if (state.phase !== 'BOARD' || state.promotion || state.chess.turn() !== PLAYER_COLOR) return
+    if (state.phase !== 'BOARD' || state.promotion) return
+    const activeColor = state.chess.turn()
+    if (state.mode === 'AI' && activeColor !== PLAYER_COLOR) return
 
     const piece = state.chess.get(square)
     if (state.selected === null) {
-      if (piece?.color === PLAYER_COLOR) {
+      if (piece?.color === activeColor) {
         const targets = state.chess.moves({ verbose: true, square }).map((move) => move.to)
         set({ selected: square, legalTargets: targets })
       }
@@ -118,17 +157,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (move) {
       const movingPiece = state.chess.get(state.selected)
-      if (movingPiece?.type === 'p' && isPromotionSquare(square, PLAYER_COLOR)) {
+      if (movingPiece?.type === 'p' && isPromotionSquare(square, activeColor)) {
         set({ promotion: { from: state.selected, to: square } })
         return
       }
       const request: MoveRequest = { from: move.from, to: move.to, promotion: move.promotion }
-      if (state.chess.get(square) || move.flags.includes('e')) get().beginDuel(request, PLAYER_COLOR)
+      if (state.chess.get(square) || move.flags.includes('e')) get().beginDuel(request, activeColor)
       else get().applyDirect(request)
       return
     }
 
-    if (piece?.color === PLAYER_COLOR) {
+    if (piece?.color === activeColor) {
       const targets = state.chess.moves({ verbose: true, square }).map((candidate) => candidate.to)
       set({ selected: square, legalTargets: targets })
     } else {
@@ -137,16 +176,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   resolvePromotion(piece) {
-    const promotion = get().promotion
+    const state = get()
+    const promotion = state.promotion
     if (!promotion) return
-    const move = get()
-      .chess.moves({ verbose: true, square: promotion.from })
+    const activeColor = state.chess.get(promotion.from)?.color
+    const move = state.chess
+      .moves({ verbose: true, square: promotion.from })
       .find((candidate) => candidate.to === promotion.to)
     set({ promotion: null })
-    if (!move) return
+    if (!move || !activeColor) return
 
     const request: MoveRequest = { from: promotion.from, to: promotion.to, promotion: piece }
-    if (get().chess.get(promotion.to)) get().beginDuel(request, PLAYER_COLOR)
+    if (state.chess.get(promotion.to)) get().beginDuel(request, activeColor)
     else get().applyDirect(request)
   },
 
@@ -166,16 +207,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       )
     if (!legal) return
     const move = state.chess.move(request)
+    const check = state.chess.isCheck()
+    const nextStatus =
+      state.mode === 'AI'
+        ? check ? 'Skak! Raja dalam ancaman.' : 'Lanjut.'
+        : `Giliran ${turnLabel(state.chess.turn(), state.mode)}${check ? ' — Skak!' : ''}.`
     set((current) => ({
       history: [...current.history, move.san],
       lastMove: { from: move.from, to: move.to },
       version: current.version + 1,
       selected: null,
       legalTargets: [],
-      status: state.chess.isCheck() ? 'Skak! Raja dalam ancaman.' : 'Lanjut.',
+      status: nextStatus,
     }))
-    if (checkOutcome(state.chess, set)) return
-    if (state.chess.turn() === AI_COLOR) set({ status: 'AI sedang menghitung langkah…' })
+    if (checkOutcome(state.chess, set, state.mode)) return
+    if (state.mode === 'AI' && state.chess.turn() === AI_COLOR) set({ status: 'AI sedang menghitung langkah…' })
   },
 
   beginDuel(request, attackerColor) {
@@ -183,15 +229,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     const attackerPiece = state.chess.get(request.from)?.type
     if (!attackerPiece) return
     const defenderPiece = state.chess.get(request.to)?.type ?? 'p'
+    const twoPlayer = state.mode === 'PVP'
     const duel: DuelSetup = {
       from: request.from,
       to: request.to,
       promotion: request.promotion,
       attackerColor,
-      defenderColor: attackerColor === PLAYER_COLOR ? AI_COLOR : PLAYER_COLOR,
+      defenderColor: attackerColor === 'w' ? 'b' : 'w',
       attackerPiece,
       defenderPiece,
-      humanSide: attackerColor === PLAYER_COLOR ? 'attacker' : 'defender',
+      humanSide: twoPlayer || attackerColor === PLAYER_COLOR ? 'attacker' : 'defender',
+      twoPlayer,
     }
     set({
       phase: 'TRANSITION',
@@ -205,10 +253,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   runAiTurn() {
     const state = get()
-    if (state.phase !== 'BOARD' || state.chess.turn() !== AI_COLOR) return
+    if (state.mode !== 'AI' || state.phase !== 'BOARD' || state.chess.turn() !== AI_COLOR) return
     const move = chooseAiMove(state.chess, AI_COLOR, matchRng)
     if (!move) {
-      checkOutcome(state.chess, set)
+      checkOutcome(state.chess, set, state.mode)
       return
     }
     const request: MoveRequest = {
@@ -221,7 +269,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   finishCombat() {
-    const { duel, engine, chess, history } = get()
+    const state = get()
+    const { duel, engine, chess, history } = state
     if (!duel || !engine?.result) return
 
     const outcome = applyDuelToChess(chess, duel, engine.result)
@@ -230,14 +279,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       DEFENDER: `${duel.from} dipukul mundur oleh bertahan.`,
       DRAW: 'Duel imbang, kedua bidak kembali.',
     }
+    const colorName = (color: Color) => (color === 'w' ? 'Putih' : 'Hitam')
     const status = outcome.kingSlain
-      ? `Raja ${duel.defenderColor === PLAYER_COLOR ? 'kamu' : 'AI'} gugur dalam duel.`
+      ? state.mode === 'PVP'
+        ? `Raja ${colorName(duel.defenderColor)} gugur. ${colorName(duel.attackerColor)} menang.`
+        : `Raja ${duel.defenderColor === PLAYER_COLOR ? 'kamu' : 'AI'} gugur dalam duel.`
       : messages[engine.result]
 
-    set((state) => ({
+    set((current) => ({
       history: [...history, outcome.notation],
-      lastMove: engine.result === 'ATTACKER' ? { from: duel.from, to: duel.to } : state.lastMove,
-      version: state.version + 1,
+      lastMove: engine.result === 'ATTACKER' ? { from: duel.from, to: duel.to } : current.lastMove,
+      version: current.version + 1,
       phase: outcome.kingSlain ? 'GAMEOVER' : 'BOARD',
       duel: null,
       engine: null,
@@ -245,7 +297,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       status,
     }))
 
-    if (!outcome.kingSlain) checkOutcome(chess, set)
+    if (!outcome.kingSlain) checkOutcome(chess, set, state.mode)
   },
 
   toggleTopDown() {
@@ -274,6 +326,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   resetGame() {
     matchRng = createRng(Date.now())
-    set({ ...initialState() })
+    const state = get()
+    set(withPreferences(state, initialState(state.mode, state.screen)))
   },
 }))
